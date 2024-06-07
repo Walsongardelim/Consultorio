@@ -1,0 +1,51 @@
+from flask import Flask, render_template, request, redirect, url_for
+import sqlite3
+
+app = Flask(__name__)
+
+# Função para conectar ao banco de dados
+def connect_db():
+    conn = sqlite3.connect('consultorio.db')
+    conn.execute('CREATE TABLE IF NOT EXISTS pacientes (id INTEGER PRIMARY KEY, nome TEXT, telefone TEXT)')
+    conn.execute('CREATE TABLE IF NOT EXISTS consultas (id INTEGER PRIMARY KEY, paciente_id INTEGER, data TEXT, hora TEXT)')
+    conn.commit()
+    return conn
+
+# Página inicial
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+# Página para agendar consulta
+@app.route('/agendar', methods=['GET', 'POST'])
+def agendar():
+    if request.method == 'POST':
+        nome = request.form['nome']
+        telefone = request.form['telefone']
+        data = request.form['data']
+        hora = request.form['hora']
+
+        conn = connect_db()
+        cursor = conn.cursor()
+
+        # Verificar se o paciente já existe no banco de dados
+        cursor.execute('SELECT id FROM pacientes WHERE nome = ? AND telefone = ?', (nome, telefone))
+        paciente_id = cursor.fetchone()
+        if not paciente_id:
+            # Se o paciente não existir, adicioná-lo ao banco de dados
+            cursor.execute('INSERT INTO pacientes (nome, telefone) VALUES (?, ?)', (nome, telefone))
+            paciente_id = cursor.lastrowid
+        else:
+            paciente_id = paciente_id[0]
+
+        # Agendar a consulta para o paciente
+        cursor.execute('INSERT INTO consultas (paciente_id, data, hora) VALUES (?, ?, ?)', (paciente_id, data, hora))
+        conn.commit()
+        conn.close()
+
+        return redirect(url_for('index'))
+
+    return render_template('agendar.html')
+
+if __name__ == '__main__':
+    app.run(debug=True)
